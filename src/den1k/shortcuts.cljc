@@ -29,25 +29,29 @@
             :value       @input-value})]
   As a convenience, handler can return `false` to prevent event and stop propagation."
   ([combos+handlers] (shortcuts combos+handlers default-remap))
-  ([combos+handlers re-map]
+  ([{:as combos+handlers :keys [debug?]} re-map]
    #?(:cljs
       (let [current-combo (atom #{})
-            shortcuts     (parse-combos combos+handlers)
+            shortcuts     (parse-combos (dissoc combos+handlers :debug?))
             lookup-key    (fn [e] (as-> (event->key e) k
                                         (or (re-map k) k)))
             on-key-down   (fn [e]
-                            (let [k     (lookup-key e)
-                                  combo (swap! current-combo conj k)]
-                              (when-not (meta-keys k)
+                            (let [k      (lookup-key e)
+                                  combo  (swap! current-combo conj k)
+                                  meta-k (meta-keys k)]
+                              (when-not meta-k
                                 ; meta keys block the keyup event, so we throw out
                                 ; non-meta keys immediately.
                                 ; This means there can only be at most one non-meta-key
                                 ; as part of the combo
                                 (swap! current-combo disj k))
-                              (when-let [handler (get shortcuts combo)]
-                                (when (false? (handler e))
-                                  (.preventDefault e)
-                                  (.stopPropagation e)))))
+                              (let [handler (get shortcuts combo)]
+                                (when debug?
+                                  (js/console.log ::debug :k k :combo combo :handler handler))
+                                (when handler
+                                  (when (false? (handler e))
+                                    (.preventDefault e)
+                                    (.stopPropagation e))))))
             on-key-up     (fn [e]
                             (let [k (lookup-key e)]
                               (swap! current-combo disj k)))]
